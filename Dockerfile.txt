@@ -1,0 +1,38 @@
+# Step 1: Base image for build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /usr/src/app
+
+# Copy dependency files
+COPY package*.json ./
+
+# Install all dependencies including devDependencies to run build
+RUN npm ci
+
+# Copy all codebase files
+COPY . .
+
+# Compile Frontend (Vite) and Backend Server into dist folder
+RUN npm run build
+
+# Step 2: Tiny production runner stage
+FROM node:20-alpine AS runner
+
+WORKDIR /usr/src/app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy package files
+COPY package*.json ./
+
+# Install ONLY production dependencies to keep the server lightweight
+RUN npm ci --only=production
+
+# Copy compiled build artifacts from the builder stage
+COPY --from=builder /usr/src/app/dist ./dist
+
+EXPOSE 3000
+
+# Run the compiled production enterprise backend server
+CMD ["node", "dist/server.cjs"]
